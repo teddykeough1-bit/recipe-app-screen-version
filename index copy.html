@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Family Recipe Display</title>
+    <style>
+        :root {
+            --primary: #FF5722;
+            --primary-dark: #E64A19;
+            --bg-color: #F4F5F7;
+            --card-bg: #FFFFFF;
+            --text-main: #222222;
+            --text-muted: #555555;
+            --border-color: #DCDFE4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* COMPACT TOP BAR FOR 600PX HEIGHT */
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            white-space: nowrap;
+        }
+
+        .search-bar {
+            flex: 1;
+            max-width: 480px;
+            padding: 10px 16px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-main);
+            user-select: text;
+        }
+
+        /* FILTER BAR */
+        .filter-bar {
+            background: white;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex-shrink: 0;
+        }
+        .filter-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .filter-pill {
+            flex: 0 0 auto;
+            padding: 9px 18px;
+            background: #F1F3F5;
+            border: 1px solid transparent;
+            border-radius: 22px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-pill.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 2-COLUMN LANDSCAPE GRID FOR 1024PX WIDTH */
+        .main-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 720px) {
+            .recipe-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .recipe-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .recipe-card:active {
+            transform: scale(0.99);
+        }
+
+        .card-top {
+            display: flex;
+            gap: 14px;
+        }
+
+        .recipe-thumb {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+
+        .card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .recipe-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .recipe-category {
+            background: #FFE0B2;
+            color: #E65100;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+
+        .tag-badge {
+            background: #E8F5E9;
+            color: #2E7D32;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .recipe-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.25;
+            margin-bottom: 6px;
+        }
+
+        .recipe-preview {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.35;
+        }
+
+        /* FULLSCREEN 1024x600 SPLIT-PANE RECIPE VIEW */
+        .app-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #FFFFFF;
+            z-index: 9999;
+            flex-direction: column;
+        }
+        .app-modal-overlay.active {
+            display: flex;
+        }
+
+        .app-modal-header {
+            padding: 12px 20px;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+
+        .modal-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .modal-header-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .cook-mode-launch-btn {
+            background: #FFFFFF;
+            color: var(--primary);
+            border: none;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .app-modal-close {
+            background: rgba(0,0,0,0.2);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* TWO-COLUMN INTERIOR FOR 1024x600 */
+        .modal-split-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .modal-left-pane {
+            width: 390px;
+            background: #F8F9FA;
+            border-right: 1px solid var(--border-color);
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .modal-right-pane {
+            flex: 1;
+            padding: 20px 24px;
+            overflow-y: auto;
+            background: #FFFFFF;
+        }
+
+        .utility-box {
+            background: #FFFFFF;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 14px;
+        }
+
+        .utility-title {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.4px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .touch-chip {
+            flex: 1;
+            min-width: 64px;
+            background: #F1F3F5;
+            border: 1px solid var(--border-color);
+            padding: 10px 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .touch-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .timer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .timer-display {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .section-heading {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .ingredients-text {
+            font-size: 1.05rem;
+            line-height: 1.55;
+            color: var(--text-main);
+            white-space: pre-line;
+        }
+
+        .steps-text {
+            font-size: 1.15rem;
+            line-height: 1.65;
+            color: var(--text-main);
+            white-space: pre-line;
+        }
+
+        .modal-hero-img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        /* FULLSCREEN STEP-BY-STEP COOKING SLIDES (1024x600 OPTIMIZED) */
+        .cooking-mode-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #FFFFFF;
+            z-index: 10000;
+            flex-direction: column;
+            padding: 20px 28px;
+        }
+        .cooking-mode-overlay.active {
+            display: flex;
+        }
+
+        .cooking-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .slide-counter {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .exit-cook-btn {
+            background: #FFEBEE;
+            color: #C62828;
+            border: 1px solid #FFCDD2;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .step-focus-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 28px 48px;
+            background: #F8F9FA;
+            border-radius: 16px;
+            margin: 16px 0;
+            border: 1px solid var(--border-color);
+            overflow-y: auto;
+        }
+
+        .step-title-slide {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .step-focus-text {
+            font-size: 1.65rem;
+            line-height: 1.5;
+            color: #111111;
+            max-width: 860px;
+        }
+
+        .cooking-nav-bar {
+            display: flex;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+
+        .nav-slide-btn {
+            flex: 1;
+            padding: 16px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">Family Recipes</div>
+        <input type="text" id="searchInput" class="search-bar" placeholder="Search recipes or ingredients..." oninput="window.filterAndRenderRecipes()">
+    </header>
+
+    <div class="filter-bar" id="filterContainer">
+        <button class="filter-pill active" onclick="window.setFilter('all', this)">All</button>
+        <button class="filter-pill" onclick="window.setFilter('food', this)">Food</button>
+        <button class="filter-pill" onclick="window.setFilter('starters', this)">Starters</button>
+        <button class="filter-pill" onclick="window.setFilter('mains', this)">Mains</button>
+        <button class="filter-pill" onclick="window.setFilter('desserts', this)">Desserts</button>
+        <button class="filter-pill" onclick="window.setFilter('drinks', this)">Drinks</button>
+        <button class="filter-pill" onclick="window.setFilter('vegetarian', this)">Vegetarian</button>
+        <button class="filter-pill" onclick="window.setFilter('gluten-free', this)">Gluten-Free</button>
+        <button class="filter-pill" onclick="window.setFilter('quick', this)">Quick (&lt;30m)</button>
+    </div>
+
+    <div class="main-container">
+        <div class="recipe-grid" id="recipeGrid"></div>
+    </div>
+
+    <!-- FULLSCREEN SPLIT-PANE RECIPE VIEWER -->
+    <div class="app-modal-overlay" id="recipeModal">
+        <div class="app-modal-header">
+            <div class="modal-header-left">
+                <span class="recipe-category" id="modalCategory" style="background: white; color: var(--primary); font-size: 0.85rem;">CATEGORY</span>
+                <div class="modal-header-title" id="modalTitle">Recipe Title</div>
+            </div>
+            <div class="modal-header-actions">
+                <button class="cook-mode-launch-btn" onclick="window.startCookingMode()">📖 Start Cooking Mode</button>
+                <button class="app-modal-close" onclick="window.closeAppModal()">&times;</button>
+            </div>
+        </div>
+
+        <div class="modal-split-body">
+            <!-- LEFT PANE: SCALER, TIMER & INGREDIENTS -->
+            <div class="modal-left-pane">
+                <div class="utility-box">
+                    <div class="utility-title">Portion Scale & Units</div>
+                    <div class="btn-row" style="margin-bottom: 8px;">
+                        <button class="touch-chip active" onclick="window.scaleIngredients(1, this)">1x</button>
+                        <button class="touch-chip" onclick="window.scaleIngredients(2, this)">2x</button>
+                        <button class="touch-chip" onclick="window.scaleIngredients(4, this)">4x</button>
+                    </div>
+                    <div class="btn-row">
+                        <button class="touch-chip active" id="unitMetricBtn" onclick="window.toggleUnits('metric')">Metric (g/ml)</button>
+                        <button class="touch-chip" id="unitImperialBtn" onclick="window.toggleUnits('imperial')">Imperial (oz/cups)</button>
+                    </div>
+                </div>
+
+                <div class="utility-box">
+                    <div class="utility-title">Kitchen Timer</div>
+                    <div class="btn-row">
+                        <button class="touch-chip" onclick="window.setKitchenTimer(5)">5m</button>
+                        <button class="touch-chip" onclick="window.setKitchenTimer(10)">10m</button>
+                        <button class="touch-chip" onclick="window.setKitchenTimer(15)">15m</button>
+                        <button class="touch-chip" onclick="window.setKitchenTimer(30)">30m</button>
+                    </div>
+                    <div class="timer-row">
+                        <div class="timer-display" id="timerDisplay">00:00</div>
+                        <div class="btn-row">
+                            <button class="touch-chip" style="background:#E8F5E9; color:#2E7D32; border-color:#C8E6C9;" onclick="window.toggleTimer()">Start / Pause</button>
+                            <button class="touch-chip" onclick="window.resetTimer()">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-heading">Ingredients</div>
+                <div id="modalIngredients" class="ingredients-text"></div>
+            </div>
+
+            <!-- RIGHT PANE: PHOTO & STEP-BY-STEP INSTRUCTIONS -->
+            <div class="modal-right-pane">
+                <img id="modalImage" class="modal-hero-img" style="display:none;" alt="Recipe photo">
+                <div class="section-heading">Instructions</div>
+                <div id="modalDetails" class="steps-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULLSCREEN SLIDE-BY-SLIDE COOKING MODE -->
+    <div class="cooking-mode-overlay" id="cookingModeOverlay">
+        <div class="cooking-top-bar">
+            <span id="cookingSlideHeader" class="slide-counter">Slide 1</span>
+            <button class="exit-cook-btn" onclick="window.exitCookingMode()">Exit Cooking Mode</button>
+        </div>
+
+        <div class="step-focus-card" id="stepFocusCard"></div>
+
+        <div class="cooking-nav-bar">
+            <button class="nav-slide-btn" style="background:#555555;" onclick="window.navSlide(-1)">← Previous</button>
+            <button class="nav-slide-btn" style="background:var(--primary);" onclick="window.navSlide(1)">Next Slide →</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCv18t11RS-xlsLiAuhHTTqkgTqCknlnQ",
+            authDomain: "the-recipe-factory-b31e1.firebaseapp.com",
+            databaseURL: "https://the-recipe-factory-b31e1-default-rtdb.firebaseio.com",
+            projectId: "the-recipe-factory-b31e1",
+            storageBucket: "the-recipe-factory-b31e1.firebasestorage.app",
+            messagingSenderId: "399882784864",
+            appId: "1:399882784864:web:687cc4440ee53e00d8b305"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const recipesRef = ref(db, 'recipes');
+
+        let recipes = {};
+        let currentFilter = 'all';
+
+        let currentModalRecipe = null;
+        let originalModalIngredients = '';
+        let originalModalDetails = '';
+        let currentScale = 1;
+        let currentUnitSystem = 'metric';
+
+        let timerInterval = null;
+        let timerSeconds = 0;
+        let timerRunning = false;
+
+        let slides = [];
+        let currentSlideIdx = 0;
+
+        onValue(recipesRef, (snapshot) => {
+            recipes = snapshot.val() || {};
+            window.filterAndRenderRecipes();
+        });
+
+        window.setFilter = function(filterType, pillElement) {
+            currentFilter = filterType;
+            document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'));
+            pillElement.classList.add('active');
+            window.filterAndRenderRecipes();
+        };
+
+        window.filterAndRenderRecipes = function() {
+            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const grid = document.getElementById('recipeGrid');
+            if (!grid) return;
+
+            const filtered = Object.entries(recipes).filter(([key, recipe]) => {
+                const matchesSearch = (recipe.title || '').toLowerCase().includes(searchQuery) ||
+                                      (recipe.ingredients || '').toLowerCase().includes(searchQuery) ||
+                                      (recipe.details || '').toLowerCase().includes(searchQuery);
+
+                if (!matchesSearch) return false;
+                if (currentFilter === 'all') return true;
+                if (currentFilter === 'food') return ['starters', 'mains', 'desserts'].includes(recipe.category);
+                if (currentFilter === 'vegetarian') return recipe.veg;
+                if (currentFilter === 'gluten-free') return recipe.gf;
+                if (currentFilter === 'quick') return recipe.quick;
+
+                return recipe.category === currentFilter;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<p style="grid-column: 1 / -1; text-align:center; color:var(--text-muted); padding: 40px; font-size: 1.1rem;">No recipes match your filter.</p>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(([key, recipe]) => `
+                <div class="recipe-card" onclick="window.openRecipeViewer('${key}')">
+                    <div class="card-top">
+                        ${recipe.image ? `<img src="${recipe.image}" class="recipe-thumb" alt="${recipe.title}">` : ''}
+                        <div class="card-info">
+                            <div class="recipe-tags">
+                                <span class="recipe-category">${recipe.category}</span>
+                                ${recipe.veg ? `<span class="tag-badge">Veg</span>` : ''}
+                                ${recipe.gf ? `<span class="tag-badge">GF</span>` : ''}
+                                ${recipe.quick ? `<span class="tag-badge">Quick</span>` : ''}
+                                ${recipe.timerMins ? `<span class="tag-badge" style="background:#FFF3E0; color:#E65100;">⏱️ ${recipe.timerMins}m</span>` : ''}
+                            </div>
+                            <div class="recipe-title">${recipe.title}</div>
+                            <div class="recipe-preview">${recipe.ingredients || recipe.details || ''}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.openRecipeViewer = function(key) {
+            const recipe = recipes[key];
+            if (!recipe) return;
+
+            currentModalRecipe = recipe;
+            originalModalIngredients = recipe.ingredients || '';
+            originalModalDetails = recipe.details || '';
+            currentScale = 1;
+            currentUnitSystem = 'metric';
+
+            document.getElementById('modalCategory').innerText = recipe.category;
+            document.getElementById('modalTitle').innerText = recipe.title;
+            document.getElementById('modalIngredients').innerText = originalModalIngredients || 'No separate ingredients listed.';
+            document.getElementById('modalDetails').innerText = originalModalDetails || '';
+
+            const modalImg = document.getElementById('modalImage');
+            if (recipe.image) {
+                modalImg.src = recipe.image;
+                modalImg.style.display = 'block';
+            } else {
+                modalImg.style.display = 'none';
+            }
+
+            if (recipe.timerMins) {
+                window.setKitchenTimer(recipe.timerMins);
+            } else {
+                window.resetTimer();
+            }
+
+            const scaleBtns = document.querySelectorAll('.modal-left-pane .utility-box:first-child .btn-row:first-of-type .touch-chip');
+            scaleBtns.forEach((b, i) => b.classList.toggle('active', i === 0));
+            document.getElementById('unitMetricBtn').classList.add('active');
+            document.getElementById('unitImperialBtn').classList.remove('active');
+
+            document.getElementById('recipeModal').classList.add('active');
+        };
+
+        window.closeAppModal = function() {
+            document.getElementById('recipeModal').classList.remove('active');
+        };
+
+        function applyScaleAndUnits() {
+            let ing = originalModalIngredients;
+            let det = originalModalDetails;
+
+            if (ing) {
+                ing = ing.replace(/(\d+(\.\d+)?)/g, (match) => {
+                    const scaled = parseFloat(match) * currentScale;
+                    return Number.isInteger(scaled) ? scaled.toString() : scaled.toFixed(1).replace(/\.0$/, '');
+                });
+                if (currentUnitSystem === 'imperial') {
+                    ing = ing.replace(/(\d+(\.\d+)?)\s*g\b/gi, (m, g) => `${(parseFloat(g) / 28.35).toFixed(1)} oz`);
+                    ing = ing.replace(/(\d+(\.\d+)?)\s*ml\b/gi, (m, ml) => `${(parseFloat(ml) / 240).toFixed(1)} cups`);
+                }
+                document.getElementById('modalIngredients').innerText = ing;
+            }
+
+            if (det) {
+                det = det.replace(/(\d+(\.\d+)?)/g, (match) => {
+                    const scaled = parseFloat(match) * currentScale;
+                    return Number.isInteger(scaled) ? scaled.toString() : scaled.toFixed(1).replace(/\.0$/, '');
+                });
+                document.getElementById('modalDetails').innerText = det;
+            }
+        }
+
+        window.scaleIngredients = function(factor, element) {
+            currentScale = factor;
+            element.parentElement.querySelectorAll('.touch-chip').forEach(b => b.classList.remove('active'));
+            element.classList.add('active');
+            applyScaleAndUnits();
+        };
+
+        window.toggleUnits = function(system) {
+            currentUnitSystem = system;
+            document.getElementById('unitMetricBtn').classList.toggle('active', system === 'metric');
+            document.getElementById('unitImperialBtn').classList.toggle('active', system === 'imperial');
+            applyScaleAndUnits();
+        };
+
+        /* SLIDE COOKING MODE */
+        window.startCookingMode = function() {
+            if (!originalModalDetails) return;
+            const rawLines = originalModalDetails.split('\n').filter(s => s.trim().length > 0);
+            if (rawLines.length === 0) return;
+
+            slides = [];
+            rawLines.forEach((line, idx) => {
+                slides.push({ type: 'header', text: `Step ${idx + 1}` });
+                slides.push({ type: 'content', text: line, stepNum: idx + 1 });
+            });
+
+            currentSlideIdx = 0;
+            renderCookingSlide();
+            document.getElementById('cookingModeOverlay').classList.add('active');
+        };
+
+        window.navSlide = function(dir) {
+            currentSlideIdx += dir;
+            if (currentSlideIdx < 0) currentSlideIdx = 0;
+            if (currentSlideIdx >= slides.length) currentSlideIdx = slides.length - 1;
+            renderCookingSlide();
+        };
+
+        function renderCookingSlide() {
+            const card = document.getElementById('stepFocusCard');
+            const current = slides[currentSlideIdx];
+            document.getElementById('cookingSlideHeader').innerText = `Slide ${currentSlideIdx + 1} of ${slides.length}`;
+
+            if (current.type === 'header') {
+                card.innerHTML = `<div class="step-title-slide">${current.text}</div>`;
+            } else {
+                card.innerHTML = `
+                    <div style="font-size:1rem; font-weight:800; color:var(--text-muted); margin-bottom:14px; letter-spacing:0.5px;">STEP ${current.stepNum} INSTRUCTIONS</div>
+                    <div class="step-focus-text">${current.text}</div>
+                    ${currentModalRecipe && currentModalRecipe.timerMins ? `
+                        <button style="margin-top:24px; padding:12px 24px; font-size:1.05rem; font-weight:700; background:var(--primary); color:white; border:none; border-radius:10px; cursor:pointer;" onclick="window.setKitchenTimer(${currentModalRecipe.timerMins}); window.toggleTimer();">
+                            ⏱️ Start ${currentModalRecipe.timerMins}m Timer
+                        </button>
+                    ` : ''}
+                `;
+            }
+        }
+
+        window.exitCookingMode = function() {
+            document.getElementById('cookingModeOverlay').classList.remove('active');
+        };
+
+        /* KITCHEN TIMER */
+        window.setKitchenTimer = function(minutes) {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            timerSeconds = minutes * 60;
+            updateTimerDisplay();
+        };
+
+        window.toggleTimer = function() {
+            if (timerRunning) {
+                clearInterval(timerInterval);
+                timerRunning = false;
+            } else {
+                if (timerSeconds <= 0) return;
+                timerRunning = true;
+                timerInterval = setInterval(() => {
+                    timerSeconds--;
+                    updateTimerDisplay();
+                    if (timerSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        timerRunning = false;
+                        alert("⏱️ Kitchen Timer Finished!");
+                    }
+                }, 1000);
+            }
+        };
+
+        window.resetTimer = function() {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            timerSeconds = 0;
+            updateTimerDisplay();
+        };
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timerSeconds / 60);
+            const secs = timerSeconds % 60;
+            document.getElementById('timerDisplay').innerText =
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
